@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { PlantAnimation } from "./plant-animation";
 
 type MoistureStatusProps = {
   moistureLevel: number;
@@ -29,18 +30,19 @@ export function MoistureStatus({ moistureLevel }: MoistureStatusProps) {
   }
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <CardTitle>Humedad del Suelo</CardTitle>
-        <CardDescription>Lectura del sensor en tiempo real de tu jardín.</CardDescription>
+        <CardDescription>Lectura del sensor en tiempo real.</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-bold font-headline">{level}%</span>
-          <span className={cn("font-medium", statusColor)}>{statusText}</span>
-        </div>
-        <div>
-          <Progress value={level} className="h-4" indicatorClassName={progressColor} />
+      <CardContent className="flex flex-col items-center justify-center text-center flex-grow gap-4">
+        <PlantAnimation moistureLevel={level} />
+        <div className="flex flex-col items-center gap-2 w-full">
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold font-headline">{level}%</span>
+          </div>
+          <p className={cn("font-medium", statusColor)}>{statusText}</p>
+          <Progress value={level} className="h-4 w-full" indicatorClassName={progressColor} />
         </div>
       </CardContent>
     </Card>
