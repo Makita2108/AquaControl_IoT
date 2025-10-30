@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "plant-closeup",
+      "description": "A close-up of a green plant with water droplets.",
+      "imageUrl": "https://images.unsplash.com/photo-1566405382187-a5937a822773?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxncmVlbiUyMHBsYW50fGVufDB8fHx8MTc2MTg0Mzg2OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "green plant"
+    }
+  ]
 }
