@@ -45,6 +45,37 @@ export const PlantAnimation: React.FC<PlantAnimationProps> = ({ moistureLevel })
     stemStyle.transform = 'rotate(0deg)';
   }
 
+  const Face = () => {
+    if (plantState === 'droopy') {
+      return (
+        <>
+          {/* Sad Face */}
+          <circle cx="46" cy="30" r="1.5" fill="black" />
+          <circle cx="54" cy="30" r="1.5" fill="black" />
+          <path d="M47 36 q3 -4 6 0" stroke="black" strokeWidth="1" fill="none" />
+        </>
+      );
+    }
+    if (plantState === 'overwatered') {
+        return (
+            <>
+            {/* Worried Face */}
+            <circle cx="46" cy="30" r="1.5" fill="black" />
+            <circle cx="54" cy="30" r="1.5" fill="black" />
+            <path d="M47 36 h6" stroke="black" strokeWidth="1" fill="none" />
+            </>
+        );
+    }
+    return (
+      <>
+        {/* Happy Face */}
+        <circle cx="46" cy="30" r="1.5" fill="black" />
+        <circle cx="54" cy="30" r="1.5" fill="black" />
+        <path d="M47 35 q3 4 6 0" stroke="black" strokeWidth="1.2" fill="none" />
+      </>
+    );
+  };
+
   return (
     <div className="w-48 h-48 flex items-center justify-center">
       <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -66,6 +97,14 @@ export const PlantAnimation: React.FC<PlantAnimationProps> = ({ moistureLevel })
           <path d="M50 45 Q 42 40 35 30 C 40 38 48 43 50 45" fill="hsl(var(--primary))" style={{...leafStyle, transform: plantState === 'droopy' ? 'rotate(20deg)' : 'none'}}/>
           <path d="M50 45 Q 58 40 65 30 C 60 38 52 43 50 45" fill="hsl(var(--primary))" style={{...rightLeafStyle, transform: plantState === 'droopy' ? 'rotate(-20deg)' : 'none'}}/>
 
+           {/* Flower */}
+           <g style={{...stemStyle, transformOrigin: '50px 30px', transform: plantState === 'droopy' ? 'rotate(10deg)' : 'none'}}>
+            {/* Petals */}
+            <circle cx="50" cy="32" r="14" fill="hsl(var(--accent))" opacity="0.8"/>
+            {/* Face Center */}
+            <circle cx="50" cy="32" r="10" fill="hsl(var(--accent))" />
+            <Face />
+          </g>
         </g>
       </svg>
     </div>
