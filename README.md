@@ -8,6 +8,7 @@
 *   **Backend Centralizado con Firebase:** Utiliza Firebase Realtime Database para una comunicación fluida y en tiempo real entre el dispositivo ESP32 y la aplicación móvil.
 *   **Autenticación Segura:** Implementa un sistema de registro e inicio de sesión de usuarios con Firebase Authentication, protegiendo el acceso a los datos.
 *   **Firmware para ESP32:** Incluye el código fuente para el microcontrolador ESP32, encargado de leer los sensores y actuar sobre el sistema de riego.
+*   **Control Climático Inteligente:** El firmware implementa una lógica de control automático para el ventilador basada en umbrales de temperatura leídos desde Firebase, además de permitir el control manual del ventilador desde la app.
 *   **Control y Monitorización:** Visualiza datos de sensores en tiempo real y controla los actuadores (ventilador, válvula de agua) directamente desde la app.
 
 ## Empezando
@@ -21,8 +22,8 @@ Asegúrate de tener el [SDK de Flutter](https://docs.flutter.dev/get-started/ins
 ### 1. Clona el Repositorio
 
 ```bash
-git clone https://github.com/Makita2108/studio.git
-cd studio
+git clone https://github.com/Makita2108/AquaControl_IoT.git
+cd AquaControl_IoT
 ```
 
 ### 2. Configura el Firmware del ESP32
