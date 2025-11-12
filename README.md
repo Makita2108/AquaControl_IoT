@@ -7,9 +7,29 @@
 *   **Interfaz Móvil con Flutter:** Una aplicación móvil moderna y fácil de usar, construida con Flutter para un rendimiento nativo en Android y iOS.
 *   **Backend Centralizado con Firebase:** Utiliza Firebase Realtime Database para una comunicación fluida y en tiempo real entre el dispositivo ESP32 y la aplicación móvil.
 *   **Autenticación Segura:** Implementa un sistema de registro e inicio de sesión de usuarios con Firebase Authentication, protegiendo el acceso a los datos.
-*   **Firmware para ESP32:** Incluye el código fuente para el microcontrolador ESP32, encargado de leer los sensores y actuar sobre el sistema de riego.
-*   **Control Climático Inteligente:** El firmware implementa una lógica de control automático para el ventilador basada en umbrales de temperatura leídos desde Firebase, además de permitir el control manual del ventilador desde la app.
-*   **Control y Monitorización:** Visualiza datos de sensores en tiempo real y controla los actuadores (ventilador, válvula de agua) directamente desde la app.
+*   **Firmware para ESP32:** Incluye el código fuente para el microcontrolador ESP32, que implementa la lógica de control completa.
+*   **Control Climático Inteligente:** El sistema permite un control del ventilador tanto **manual** como **automático**, basado en un umbral de temperatura ajustable desde la app.
+*   **Control de Riego:** Permite la activación remota de la válvula de agua.
+*   **Monitorización en Tiempo Real:** Visualiza datos de temperatura, humedad ambiente y humedad del suelo directamente en la app.
+
+## Estructura de la Base de Datos en Firebase
+
+El proyecto utiliza una estructura de datos específica en Firebase Realtime Database para desacoplar las lecturas de los sensores, los comandos del usuario y el estado real del sistema. 
+
+*   `/readings` (Escrito por el ESP32)
+    *   `temperature`: Valor numérico del sensor de temperatura.
+    *   `humidity`: Valor numérico del sensor de humedad.
+    *   `soilMoisture1`: Valor numérico del sensor de humedad del suelo.
+
+*   `/controls` (Escrito por la App, leído por el ESP32)
+    *   `valveCommand`: `true`/`false` para abrir/cerrar la válvula.
+    *   `fanAutoMode`: `true`/`false` para activar el modo automático del ventilador.
+    *   `fanManualCommand`: `true`/`false` para encender/apagar el ventilador en modo manual.
+    *   `tempThreshold`: Valor numérico para el umbral de temperatura del modo automático.
+
+*   `/state` (Escrito por el ESP32, leído por la App)
+    *   `valveState`: `true`/`false`, estado real de la válvula.
+    *   `fanState`: `true`/`false`, estado real del ventilador.
 
 ## Empezando
 
@@ -58,7 +78,7 @@ flutter run
 
 ## Paso Final: Configurar Reglas de Seguridad
 
-Para cumplir con los requisitos de seguridad y proteger tu base de datos, es **crucial** que configures las reglas en tu consola de Firebase.
+Para proteger tu base de datos, es **crucial** que configures las reglas en tu consola de Firebase.
 
 1.  Ve a tu Proyecto de Firebase.
 2.  En el menú, selecciona **Realtime Database**.
@@ -73,5 +93,3 @@ Para cumplir con los requisitos de seguridad y proteger tu base de datos, es **c
   }
 }
 ```
-
-Estas reglas garantizan que solo los usuarios autenticados en tu aplicación puedan leer o escribir datos.

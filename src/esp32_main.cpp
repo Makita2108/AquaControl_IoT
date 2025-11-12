@@ -2,40 +2,58 @@
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
 
-// Replace with your network credentials
+// --- Configuración de Red y Firebase ---
+// Reemplaza con tus credenciales
 #define WIFI_SSID "YOUR_WIFI_SSID"
 #define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
-
-// Replace with your Firebase project API Key
 #define API_KEY "YOUR_FIREBASE_API_KEY"
-
-// Replace with your Firebase Realtime Database URL
 #define DATABASE_URL "YOUR_FIREBASE_DATABASE_URL"
 
-// Define Firebase objects
+// --- Pines de los Actuadores ---
+// (Descomenta y asigna los pines correctos para tu hardware)
+// #define VALVE_PIN 26
+// #define FAN_PIN 27
+
+// --- Objetos de Firebase ---
 FirebaseData stream;
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
-// Variables to store sensor data
+// --- Variables de Estado y Lectura ---
+// Lecturas de sensores
+float temperature = 0.0;
+float humidity = 0.0;
 float soilMoisture1 = 0.0;
-float soilMoisture2 = 0.0;
 
-// Variable to store actuator states
-bool valveOn = false;
+// Estado real de los actuadores
+bool valveState = false;
+bool fanState = false;
 
-// Flag to indicate if we are connected to Firebase
-bool firebaseConnected = false;
+// Comandos recibidos desde la App
+bool valveCommand = false;
+bool fanManualCommand = false;
 
+// Lógica de control
+bool fanAutoMode = true;       // Inicia en modo automático por defecto
+float tempThreshold = 28.0;    // Umbral de temperatura en Celsius
+
+// --- Declaración de Funciones ---
 void streamCallback(FirebaseStream data);
 void streamTimeoutCallback(bool timeout);
-void sendDataToFirebase();
+void sendReadingsToFirebase();
+void handleControlLogic();
+void updateActuatorStatesOnFirebase();
+void applyActuatorStates();
 
 void setup() {
   Serial.begin(115200);
 
-  // Connect to Wi-Fi
+  // (Descomenta para usar los pines)
+  // pinMode(VALVE_PIN, OUTPUT);
+  // pinMode(FAN_PIN, OUTPUT);
+
+  // --- Conexión Wi-Fi ---
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to Wi-Fi");
   while (WiFi.status() != WL_CONNECTED) {
@@ -45,90 +63,118 @@ void setup() {
   Serial.println();
   Serial.print("Connected with IP: ");
   Serial.println(WiFi.localIP());
-  Serial.println();
 
-  // Assign the API key (required)
+  // --- Configuración de Firebase ---
   config.api_key = API_KEY;
-
-  // Assign the RTDB URL (required)
   config.database_url = DATABASE_URL;
-
-  // Sign up anonymously
-  config.signer.test_mode = true;
-
-  // Assign the stream callback function
+  config.signer.test_mode = true; // Usar autenticación anónima
   config.stream_callback = streamCallback;
-
-  // Assign the stream timeout callback function
   config.stream_timeout_callback = streamTimeoutCallback;
 
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
-  
-  // Listen for commands
-  if (!Firebase.RTDB.beginStream(&stream, "/commands")) {
-    Serial.println("Can't begin stream path: /commands");
-    Serial.println("REASON: " + stream.errorReason());
+
+  // --- Iniciar Stream de Firebase ---
+  // Escucha cambios en el nodo /controls
+  if (!Firebase.RTDB.beginStream(&stream, "/controls")) {
+    Serial.printf("Stream begin error, %s\n", stream.errorReason().c_str());
   }
 }
 
 void loop() {
-  // Simulate sensor readings
-  soilMoisture1 = random(30, 70);
-  soilMoisture2 = random(40, 80);
+  // --- Simulación de Lectura de Sensores ---
+  // (Reemplaza con lecturas de tus sensores reales, ej: DHT11, etc.)
+  temperature = random(200, 350) / 10.0; // Temp entre 20.0 y 35.0 C
+  humidity = random(40, 70);
+  soilMoisture1 = random(30, 80);
 
-  if (WiFi.status() == WL_CONNECTED && firebaseConnected) {
-    sendDataToFirebase();
+  // Solo ejecuta la lógica si estamos conectados a Firebase
+  if (Firebase.ready()) {
+    handleControlLogic();
+    sendReadingsToFirebase();
+    updateActuatorStatesOnFirebase();
   }
 
-  delay(5000); // Wait 5 seconds
+  delay(10000); // Espera 10 segundos entre ciclos
 }
 
-void sendDataToFirebase() {
-  // Sensor 1
-  FirebaseJson sensor1;
-  sensor1.set("name", "Sensor 1");
-  sensor1.set("moistureLevel", soilMoisture1);
-  if (Firebase.RTDB.setJSON(&fbdo, "/sensors/1", &sensor1)) {
-    Serial.println("Sensor 1 data sent successfully");
+// --- Lógica de Control Principal ---
+void handleControlLogic() {
+  // La válvula siempre sigue el comando directo
+  valveState = valveCommand;
+
+  // Lógica del ventilador
+  if (fanAutoMode) {
+    // Modo Automático: se basa en la temperatura
+    fanState = (temperature > tempThreshold);
   } else {
-    Serial.println("Error sending Sensor 1 data: " + fbdo.errorReason());
+    // Modo Manual: sigue el comando de la app
+    fanState = fanManualCommand;
   }
 
-  // Sensor 2
-  FirebaseJson sensor2;
-  sensor2.set("name", "Sensor 2");
-  sensor2.set("moistureLevel", soilMoisture2);
-  if (Firebase.RTDB.setJSON(&fbdo, "/sensors/2", &sensor2)) {
-    Serial.println("Sensor 2 data sent successfully");
-  } else {
-    Serial.println("Error sending Sensor 2 data: " + fbdo.errorReason());
-  }
+  applyActuatorStates();
 }
 
+// Aplica los estados a los pines físicos
+void applyActuatorStates(){
+    // (Descomenta y usa tus pines)
+    // digitalWrite(VALVE_PIN, valveState);
+    // digitalWrite(FAN_PIN, fanState);
+
+    Serial.printf("Estado Válvula: %s, Estado Ventilador: %s (Modo: %s)\n", 
+                  valveState ? "ON" : "OFF", 
+                  fanState ? "ON" : "OFF", 
+                  fanAutoMode ? "Auto" : "Manual");
+}
+
+
+// --- Funciones de Firebase ---
+
+// Se ejecuta cuando llegan datos del stream (/controls)
 void streamCallback(FirebaseStream data) {
-  Serial.printf("stream path, %s/%s\n", data.streamPath().c_str(), data.dataPath().c_str());
-  if (data.dataType() == "boolean" && String(data.dataPath().c_str()).equals("/valve")) {
-    valveOn = data.boolData();
-    if(valveOn){
-        Serial.println("Valve turned ON");
-        // Add code here to turn on the valve
-    } else {
-        Serial.println("Valve turned OFF");
-        // Add code here to turn off the valve
-    }
+  String path = data.dataPath();
+  Serial.printf("Stream a: %s, Valor: %s, Tipo: %s\n", path.c_str(), data.stringData().c_str(), data.dataType().c_str());
+
+  if (path == "/valveCommand") {
+    if(data.dataType() == "boolean") valveCommand = data.boolData();
+  } else if (path == "/fanManualCommand") {
+    if(data.dataType() == "boolean") fanManualCommand = data.boolData();
+  } else if (path == "/fanAutoMode") {
+    if(data.dataType() == "boolean") fanAutoMode = data.boolData();
+  } else if (path == "/tempThreshold") {
+    if(data.dataType() == "number" || data.dataType() == "float") tempThreshold = data.floatData();
   }
 }
 
+// Envía las lecturas de los sensores a Firebase bajo el nodo /readings
+void sendReadingsToFirebase() {
+  FirebaseJson json;
+  json.set("temperature", temperature);
+  json.set("humidity", humidity);
+  json.set("soilMoisture1", soilMoisture1);
+
+  if (!Firebase.RTDB.setJSON(&fbdo, "/readings", &json)) {
+    Serial.printf("Error enviando lecturas: %s\n", fbdo.errorReason().c_str());
+  }
+}
+
+// Actualiza el estado real de los actuadores en Firebase bajo el nodo /state
+void updateActuatorStatesOnFirebase(){
+  FirebaseJson json;
+  json.set("valveState", valveState);
+  json.set("fanState", fanState);
+
+  if (!Firebase.RTDB.setJSON(&fbdo, "/state", &json)) {
+    Serial.printf("Error actualizando estados: %s\n", fbdo.errorReason().c_str());
+  }
+}
+
+// Manejo de timeout del stream
 void streamTimeoutCallback(bool timeout) {
   if (timeout) {
     Serial.println("Stream timeout, resuming...");
   }
-  
   if (!stream.httpConnected()) {
-    Serial.printf("error code: %d, reason: %s\n\n", stream.httpCode(), stream.errorReason().c_str());
-    firebaseConnected = false;
-  } else {
-    firebaseConnected = true;
+    Serial.printf("Error de stream, código: %d, razón: %s\n", stream.httpCode(), stream.errorReason().c_str());
   }
 }

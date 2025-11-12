@@ -1,11 +1,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../services/auth_service.dart'; // Import auth service
+import '../services/auth_service.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -16,114 +13,104 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late DatabaseReference _databaseReference;
-  final AuthService _authService = AuthService(); // Instantiate auth service
+  final AuthService _authService = AuthService();
 
-  double _temperature = 0;
-  double _humidity = 0;
-  double _soilMoisture = 0;
-  bool _fanOn = false;
-  bool _valveOn = false;
-  final List<FlSpot> _temperatureData = [];
-  final List<FlSpot> _humidityData = [];
-  final List<FlSpot> _soilMoistureData = [];
-  String _wateringTime = "Not available";
-  List<dynamic> _forecast = [];
+  // --- State Variables ---
+  // Sensor Readings
+  double _temperature = 0.0;
+  double _humidity = 0.0;
+  double _soilMoisture = 0.0;
+
+  // Actuator States (read from /state)
+  bool _valveState = false;
+  bool _fanState = false;
+
+  // Control Settings (read from /controls and send commands to it)
+  bool _fanAutoMode = true;
+  bool _fanManualCommand = false;
+  bool _valveCommand = false;
+  double _tempThreshold = 28.0;
+
+  // Debouncer for the slider to avoid too many writes
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    // TODO: Initialize _databaseReference with your Firebase URL
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // !! IMPORTANTE: Reemplaza con la URL de tu Realtime Database
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     _databaseReference = FirebaseDatabase.instance.refFromURL('YOUR_DATABASE_URL');
 
-    _databaseReference.child('data/temperature').onValue.listen((event) {
-      final data = event.snapshot.value as double? ?? 0.0;
+    // Listener for sensor readings
+    _databaseReference.child('readings').onValue.listen((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
       setState(() {
-        _temperature = data;
-        _temperatureData.add(FlSpot(DateTime.now().millisecondsSinceEpoch.toDouble(), data));
+        _temperature = (data['temperature'] as num?)?.toDouble() ?? 0.0;
+        _humidity = (data['humidity'] as num?)?.toDouble() ?? 0.0;
+        _soilMoisture = (data['soilMoisture1'] as num?)?.toDouble() ?? 0.0;
       });
     });
 
-    _databaseReference.child('data/humidity').onValue.listen((event) {
-      final data = event.snapshot.value as double? ?? 0.0;
+    // Listener for actual actuator states
+    _databaseReference.child('state').onValue.listen((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
       setState(() {
-        _humidity = data;
-        _humidityData.add(FlSpot(DateTime.now().millisecondsSinceEpoch.toDouble(), data));
+        _valveState = data['valveState'] as bool? ?? false;
+        _fanState = data['fanState'] as bool? ?? false;
       });
     });
 
-    _databaseReference.child('data/soilMoisture').onValue.listen((event) {
-      final data = event.snapshot.value as double? ?? 0.0;
+    // Listener for control settings to keep UI in sync
+    _databaseReference.child('controls').onValue.listen((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
       setState(() {
-        _soilMoisture = data;
-        _soilMoistureData.add(FlSpot(DateTime.now().millisecondsSinceEpoch.toDouble(), data));
+        _fanAutoMode = data['fanAutoMode'] as bool? ?? true;
+        _fanManualCommand = data['fanManualCommand'] as bool? ?? false;
+        _valveCommand = data['valveCommand'] as bool? ?? false;
+        _tempThreshold = (data['tempThreshold'] as num?)?.toDouble() ?? 28.0;
       });
     });
+  }
 
-    _databaseReference.child('commands/fan').onValue.listen((event) {
-      final data = event.snapshot.value as bool? ?? false;
-      setState(() {
-        _fanOn = data;
-      });
+  // --- Control Functions ---
+  void _setFanAutoMode(bool isAuto) {
+    _databaseReference.child('controls/fanAutoMode').set(isAuto);
+  }
+
+  void _setFanManualCommand(bool isOn) {
+    _databaseReference.child('controls/fanManualCommand').set(isOn);
+  }
+
+  void _setValveCommand(bool isOn) {
+    _databaseReference.child('controls/valveCommand').set(isOn);
+  }
+
+  void _setTempThreshold(double value) {
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _databaseReference.child('controls/tempThreshold').set(value);
     });
-
-    _databaseReference.child('commands/valve').onValue.listen((event) {
-      final data = event.snapshot.value as bool? ?? false;
-      setState(() {
-        _valveOn = data;
-      });
-    });
-
-    _getWateringTime();
-    _getWeatherForecast();
   }
-
-  void _toggleFan(bool value) {
-    _databaseReference.child('commands/fan').set(value);
+  
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
   }
-
-  void _toggleValve(bool value) {
-    _databaseReference.child('commands/valve').set(value);
-  }
-
-  void _getWateringTime() async {
-    final response = await http.get(Uri.parse('https://api.mocki.io/v1/b0434569'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      setState(() {
-        _wateringTime = data['time'];
-      });
-    } else {
-      setState(() {
-        _wateringTime = "Error fetching time";
-      });
-    }
-  }
-
-    void _getWeatherForecast() async {
-    final response = await http.get(Uri.parse('https://api.mocki.io/v1/b0434569'));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      setState(() {
-        _forecast = data['forecast'];
-      });
-    } else {
-      // Handle error
-    }
-  }
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Greenhouse Monitor'),
+        title: const Text('AquaControl Dashboard'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await _authService.signOut();
             },
-          )
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -131,8 +118,140 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            // ... (All your cards and widgets will go here)
-            // This part is kept the same as your original code
+            _buildSensorCard('Temperatura', '${_temperature.toStringAsFixed(1)} °C', Icons.thermostat, Colors.orange),
+            _buildSensorCard('Humedad Ambiente', '${_humidity.toStringAsFixed(1)} %', Icons.water_drop, Colors.blue),
+            _buildSensorCard('Humedad del Suelo', '${_soilMoisture.toStringAsFixed(1)} %', Icons.grass, Colors.green),
+            const SizedBox(height: 20),
+            _buildFanControlCard(),
+            _buildValveControlCard(),
+            _buildThresholdCard(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- UI Builder Widgets ---
+  Widget _buildSensorCard(String title, String value, IconData icon, Color color) {
+    return Card(
+      elevation: 4.0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Icon(icon, size: 40.0, color: color),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                Text(title, style: Theme.of(context).textTheme.headline6),
+                Text(value, style: Theme.of(context).textTheme.headline4?.copyWith(color: color, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFanControlCard() {
+    return Card(
+      elevation: 4.0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Control del Ventilador", style: Theme.of(context).textTheme.headline6),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Modo Automático"),
+                Switch(
+                  value: _fanAutoMode,
+                  onChanged: _setFanAutoMode,
+                ),
+              ],
+            ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Icon(Icons.air, size: 40.0, color: _fanState ? Colors.cyan : Colors.grey),
+                Text("Ventilador Manual", style: TextStyle(color: _fanAutoMode ? Colors.grey : Colors.black)),
+                Switch(
+                  value: _fanManualCommand,
+                  onChanged: _fanAutoMode ? null : _setFanManualCommand, // Disabled in auto mode
+                ),
+              ],
+            ),
+            if (_fanAutoMode)
+              Text("Control automático activado. Se encenderá si la T° supera los ${_tempThreshold.toStringAsFixed(1)}°C.", style: TextStyle(fontSize: 12, color: Colors.grey[600]))
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValveControlCard() {
+    return Card(
+      elevation: 4.0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+             Text("Control de Riego", style: Theme.of(context).textTheme.headline6),
+             const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Icon(Icons.opacity, size: 40.0, color: _valveState ? Colors.blueAccent : Colors.grey),
+                const Text("Válvula de Agua"),
+                Switch(
+                  value: _valveCommand,
+                  onChanged: _setValveCommand,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildThresholdCard() {
+    return Card(
+      elevation: 4.0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Ajuste de Temperatura Automática", style: Theme.of(context).textTheme.headline6),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.thermostat, color: Colors.red),
+                Expanded(
+                  child: Slider(
+                    value: _tempThreshold,
+                    min: 15,
+                    max: 40,
+                    divisions: 25,
+                    label: '${_tempThreshold.toStringAsFixed(1)} °C',
+                    onChanged: (value) {
+                       setState(() {
+                         _tempThreshold = value;
+                       });
+                       _setTempThreshold(value);
+                    },
+                  ),
+                ),
+                Text('${_tempThreshold.toStringAsFixed(1)}°C'),
+              ],
+            ),
           ],
         ),
       ),
