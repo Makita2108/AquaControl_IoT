@@ -114,6 +114,7 @@ export const PlantAnimation: React.FC<PlantAnimationProps> = ({ moistureLevel })
     ...tearFrames[tearFrameIndex],
   };
 
+
   // --- Sub-Components ---
   const Face = () => {
     if (plantState === 'droopy') {
@@ -184,8 +185,20 @@ export const PlantAnimation: React.FC<PlantAnimationProps> = ({ moistureLevel })
           <path d="M50 45 Q 42 40 35 30 C 40 38 48 43 50 45" fill="hsl(var(--primary))" style={droopyLeafStyle} />
           <path d="M50 45 Q 58 40 65 30 C 60 38 52 43 50 45" fill="hsl(var(--primary))" style={droopyRightLeafStyle} />
            <g style={droopyFlowerStyle}>
-            <circle cx="50" cy="32" r="14" fill="hsl(var(--accent))" opacity="0.8"/>
-            <circle cx="50" cy="32" r="10" fill="hsl(var(--accent))" />
+            {/* Sunflower Petals */}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <path
+                key={i}
+                d="M50 32 C 47 20, 53 20, 50 12 Z" // Teardrop petal shape
+                fill="gold"
+                style={{
+                  transform: `rotate(${(i * 360) / 12}deg)`,
+                  transformOrigin: '50px 32px',
+                }}
+              />
+            ))}
+            {/* Center of Sunflower */}
+            <circle cx="50" cy="32" r="10" fill="#654321" />
             <Face />
           </g>
         </g>
